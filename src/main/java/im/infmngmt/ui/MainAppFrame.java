@@ -16,9 +16,9 @@ public class MainAppFrame extends JFrame {
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Пациенты", new PatientPanel(patientService));
-        tabs.addTab("Диагнозы", new DiagnosisPanel(diagnosisService, patientService));
+        tabs.addTab("Диагнозы", new DiagnosisPanel(diagnosisService, patientService, treatmentSchemeService));
         tabs.addTab("Лекарства", new DrugPanel(drugService));
-        tabs.addTab("Схемы лечения", new TreatmentSchemePanel(treatmentSchemeService));
+        tabs.addTab("Схемы лечения", new TreatmentSchemePanel(treatmentSchemeService, diagnosisService, drugService));
         tabs.addTab("Назначения", new PrescriptionPanel(prescriptionService));
 
         add(tabs);
