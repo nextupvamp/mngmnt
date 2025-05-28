@@ -10,13 +10,27 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DrugService {
-    private final DrugRepository repository;
+    private final DrugRepository drugRepository;
 
     public List<Drug> getAllDrugs() {
-        return repository.findAll();
+        return drugRepository.findAll();
     }
 
-    public void saveDrug(Drug drug) {
-        repository.save(drug);
+    public List<Drug> searchDrugs(String query) {
+        return drugRepository.findByMnnContainingOrActiveSubstanceContainingOrManufacturerContaining(
+                query, query, query);
+    }
+
+    public List<Drug> getDrugAnalogs(Long drugId) {
+        // Реализация поиска аналогов
+        return drugRepository.findAnalogsByDrugId(drugId);
+    }
+
+    public Drug saveDrug(Drug drug) {
+        return drugRepository.save(drug);
+    }
+
+    public void deleteDrug(Long id) {
+        drugRepository.deleteById(id);
     }
 }

@@ -19,7 +19,7 @@ public class MainAppFrame extends JFrame {
         tabs.addTab("Диагнозы", new DiagnosisPanel(diagnosisService, patientService, treatmentSchemeService));
         tabs.addTab("Лекарства", new DrugPanel(drugService));
         tabs.addTab("Схемы лечения", new TreatmentSchemePanel(treatmentSchemeService, diagnosisService, drugService));
-        tabs.addTab("Назначения", new PrescriptionPanel(prescriptionService));
+        tabs.addTab("Назначения", new PrescriptionPanel(prescriptionService, patientService, drugService));
 
         add(tabs);
     }

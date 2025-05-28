@@ -6,32 +6,45 @@ import im.infmngmt.service.PatientService;
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class PatientPanel extends JPanel {
     private final PatientService service;
     private final JTable table = new JTable();
+    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     public PatientPanel(PatientService service) {
         this.service = service;
         setLayout(new BorderLayout());
+        initTable();
+        initButtons();
         updateTable();
+    }
 
+    private void initTable() {
+        table.setAutoCreateRowSorter(true);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+    }
+
+    private void initButtons() {
         JPanel buttonPanel = new JPanel();
+
         JButton addButton = new JButton("Добавить");
+        addButton.addActionListener(e -> addPatient());
+
         JButton editButton = new JButton("Изменить");
+        editButton.addActionListener(e -> editPatient());
+
         JButton deleteButton = new JButton("Удалить");
+        deleteButton.addActionListener(e -> deletePatient());
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
-
-        addButton.addActionListener(e -> addPatient());
-        editButton.addActionListener(e -> editPatient());
-        deleteButton.addActionListener(e -> deletePatient());
     }
 
     private void updateTable() {
@@ -39,55 +52,128 @@ public class PatientPanel extends JPanel {
     }
 
     private void addPatient() {
-        JTextField nameField = new JTextField();
+        JDialog dialog = new JDialog();
+        dialog.setTitle("Добавить пациента");
+        dialog.setLayout(new GridLayout(0, 2, 5, 5));
+
+        JTextField fullNameField = new JTextField();
         JTextField birthDateField = new JTextField();
+        JTextField passportField = new JTextField();
         JTextField snilsField = new JTextField();
+        JTextField addressField = new JTextField();
 
-        Object[] fields = {
-                "ФИО:", nameField,
-                "Дата рождения (ГГГГ-ММ-ДД):", birthDateField,
-                "СНИЛС:", snilsField
-        };
+        dialog.add(new JLabel("ФИО:"));
+        dialog.add(fullNameField);
+        dialog.add(new JLabel("Дата рождения (дд.мм.гггг):"));
+        dialog.add(birthDateField);
+        dialog.add(new JLabel("Паспорт:"));
+        dialog.add(passportField);
+        dialog.add(new JLabel("СНИЛС:"));
+        dialog.add(snilsField);
+        dialog.add(new JLabel("Адрес:"));
+        dialog.add(addressField);
 
-        int result = JOptionPane.showConfirmDialog(
-                this,
-                fields,
-                "Добавить пациента",
-                JOptionPane.OK_CANCEL_OPTION);
+        JButton saveButton = new JButton("Сохранить");
+        saveButton.addActionListener(e -> {
+            try {
+                Patient patient = new Patient();
+                patient.setFullName(fullNameField.getText());
+                patient.setBirthDate(LocalDate.parse(birthDateField.getText(), dateFormatter));
+                patient.setPassport(passportField.getText());
+                patient.setSnils(snilsField.getText());
+                patient.setAddress(addressField.getText());
 
-        if (result == JOptionPane.OK_OPTION) {
-            Patient patient = new Patient();
-            patient.setFullName(nameField.getText());
-            patient.setBirthDate(java.time.LocalDate.parse(birthDateField.getText()));
-            patient.setSnils(snilsField.getText());
-            service.save(patient);
-            updateTable();
-        }
+                service.save(patient);
+                updateTable();
+                dialog.dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, "Ошибка ввода данных: " + ex.getMessage());
+            }
+        });
+
+        dialog.add(new JLabel());
+        dialog.add(saveButton);
+        dialog.pack();
+        dialog.setModal(true);
+        dialog.setVisible(true);
     }
 
     private void editPatient() {
         int selectedRow = table.getSelectedRow();
-        if (selectedRow >= 0) {
-            Patient patient = ((PatientTableModel) table.getModel()).getPatientAt(selectedRow);
-        } else {
+        if (selectedRow < 0) {
             JOptionPane.showMessageDialog(this, "Выберите пациента для редактирования");
+            return;
         }
+
+        Patient patient = ((PatientTableModel) table.getModel()).getPatientAt(selectedRow);
+        JDialog dialog = new JDialog();
+        dialog.setTitle("Редактировать пациента");
+        dialog.setLayout(new GridLayout(0, 2, 5, 5));
+
+        JTextField fullNameField = new JTextField(patient.getFullName());
+        JTextField birthDateField = new JTextField(patient.getBirthDate().format(dateFormatter));
+        JTextField passportField = new JTextField(patient.getPassport());
+        JTextField snilsField = new JTextField(patient.getSnils());
+        JTextField addressField = new JTextField(patient.getAddress());
+
+        dialog.add(new JLabel("ФИО:"));
+        dialog.add(fullNameField);
+        dialog.add(new JLabel("Дата рождения:"));
+        dialog.add(birthDateField);
+        dialog.add(new JLabel("Паспорт:"));
+        dialog.add(passportField);
+        dialog.add(new JLabel("СНИЛС:"));
+        dialog.add(snilsField);
+        dialog.add(new JLabel("Адрес:"));
+        dialog.add(addressField);
+
+        JButton saveButton = new JButton("Сохранить");
+        saveButton.addActionListener(e -> {
+            try {
+                patient.setFullName(fullNameField.getText());
+                patient.setBirthDate(LocalDate.parse(birthDateField.getText(), dateFormatter));
+                patient.setPassport(passportField.getText());
+                patient.setSnils(snilsField.getText());
+                patient.setAddress(addressField.getText());
+
+                service.save(patient);
+                updateTable();
+                dialog.dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, "Ошибка ввода данных: " + ex.getMessage());
+            }
+        });
+
+        dialog.add(new JLabel());
+        dialog.add(saveButton);
+        dialog.pack();
+        dialog.setModal(true);
+        dialog.setVisible(true);
     }
 
     private void deletePatient() {
         int selectedRow = table.getSelectedRow();
-        if (selectedRow >= 0) {
+        if (selectedRow < 0) {
+            JOptionPane.showMessageDialog(this, "Выберите пациента для удаления");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Удалить выбранного пациента?",
+                "Подтверждение удаления",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
             Patient patient = ((PatientTableModel) table.getModel()).getPatientAt(selectedRow);
             service.delete(patient.getId());
             updateTable();
-        } else {
-            JOptionPane.showMessageDialog(this, "Выберите пациента для удаления");
         }
     }
 
     private static class PatientTableModel extends AbstractTableModel {
         private final List<Patient> patients;
-        private final String[] columnNames = {"ID", "ФИО", "Дата рождения", "СНИЛС"};
+        private final String[] columnNames = {"ФИО", "Дата рождения", "Паспорт", "СНИЛС", "Адрес"};
 
         public PatientTableModel(List<Patient> patients) {
             this.patients = patients;
@@ -112,10 +198,11 @@ public class PatientPanel extends JPanel {
         public Object getValueAt(int rowIndex, int columnIndex) {
             Patient patient = patients.get(rowIndex);
             return switch (columnIndex) {
-                case 0 -> patient.getId();
-                case 1 -> patient.getFullName();
-                case 2 -> patient.getBirthDate();
+                case 0 -> patient.getFullName();
+                case 1 -> patient.getBirthDate();
+                case 2 -> patient.getPassport();
                 case 3 -> patient.getSnils();
+                case 4 -> patient.getAddress();
                 default -> null;
             };
         }

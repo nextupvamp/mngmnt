@@ -12,18 +12,16 @@ import java.util.List;
 public class TreatmentSchemePanel extends JPanel {
     private final TreatmentSchemeService schemeService;
     private final DiagnosisService diagnosisService;
-//    private final DoctorService doctorService;
     private final DrugService drugService;
     private final JTable schemesTable = new JTable();
     private final JTable drugsTable = new JTable();
+    private final JTable controlPointsTable = new JTable();
 
     public TreatmentSchemePanel(TreatmentSchemeService schemeService,
                                 DiagnosisService diagnosisService,
-//                                DoctorService doctorService,
                                 DrugService drugService) {
         this.schemeService = schemeService;
         this.diagnosisService = diagnosisService;
-//        this.doctorService = doctorService;
         this.drugService = drugService;
 
         setLayout(new BorderLayout());
@@ -36,15 +34,28 @@ public class TreatmentSchemePanel extends JPanel {
         schemesTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateDrugsTable();
+                updateControlPointsTable();
             }
         });
 
+        // Основная панель с тремя таблицами
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.add(new JScrollPane(schemesTable), BorderLayout.CENTER);
 
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(new JLabel("Препараты в схеме:"), BorderLayout.NORTH);
-        bottomPanel.add(new JScrollPane(drugsTable), BorderLayout.CENTER);
+        // Панель для препаратов и точек контроля
+        JPanel bottomPanel = new JPanel(new GridLayout(2, 1));
+
+        // Таблица препаратов
+        JPanel drugsPanel = new JPanel(new BorderLayout());
+        drugsPanel.add(new JLabel("Препараты в схеме:"), BorderLayout.NORTH);
+        drugsPanel.add(new JScrollPane(drugsTable), BorderLayout.CENTER);
+        bottomPanel.add(drugsPanel);
+
+        // Таблица точек контроля
+        JPanel controlPointsPanel = new JPanel(new BorderLayout());
+        controlPointsPanel.add(new JLabel("Точки контроля:"), BorderLayout.NORTH);
+        controlPointsPanel.add(new JScrollPane(controlPointsTable), BorderLayout.CENTER);
+        bottomPanel.add(controlPointsPanel);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topPanel, bottomPanel);
         splitPane.setResizeWeight(0.5);
@@ -75,6 +86,7 @@ public class TreatmentSchemePanel extends JPanel {
     private void updateTables() {
         schemesTable.setModel(new SchemeTableModel(schemeService.getAllSchemes()));
         updateDrugsTable();
+        updateControlPointsTable();
     }
 
     private void updateDrugsTable() {
@@ -87,29 +99,38 @@ public class TreatmentSchemePanel extends JPanel {
         }
     }
 
+    private void updateControlPointsTable() {
+        int selectedRow = schemesTable.getSelectedRow();
+        if (selectedRow >= 0) {
+            TreatmentScheme scheme = ((SchemeTableModel) schemesTable.getModel()).getSchemeAt(selectedRow);
+            controlPointsTable.setModel(new ControlPointsTableModel(schemeService.getControlPointsBySchemeId(scheme.getId())));
+        } else {
+            controlPointsTable.setModel(new ControlPointsTableModel(List.of()));
+        }
+    }
+
     private void addNewScheme() {
         JDialog dialog = new JDialog();
         dialog.setTitle("Новая схема лечения");
-        dialog.setLayout(new GridLayout(0, 2));
+        dialog.setLayout(new GridLayout(0, 2, 5, 5));
 
         // Выбор диагноза
         JComboBox<String> diagnosisCombo = new JComboBox<>(
-                diagnosisService.getAllDiagnoses()
-                        .stream().map(Diagnosis::getDescription).toList().toArray(new String[0]));
+                diagnosisService.getAllDiagnoses().stream().map(Diagnosis::getDescription).toList().toArray(new String[0]));
 
-        // Выбор врача
-//        JComboBox<Doctor> doctorCombo = new JComboBox<>(
-//                doctorService.getAllDoctors().toArray(new Doctor[0]));
+        // Тип лечения (на русском)
+        String[] treatmentTypes = {"Стационарное", "Амбулаторное"};
+        JComboBox<String> typeCombo = new JComboBox<>(treatmentTypes);
 
-        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"inpatient", "outpatient"});
-        JComboBox<String> supervisionCombo = new JComboBox<>(new String[]{"independent", "under supervision"});
+        // Тип наблюдения (на русском)
+        String[] supervisionTypes = {"Самостоятельное", "Под наблюдением"};
+        JComboBox<String> supervisionCombo = new JComboBox<>(supervisionTypes);
+
         JTextField startDateField = new JTextField(LocalDate.now().toString());
         JTextField endDateField = new JTextField(LocalDate.now().plusDays(30).toString());
 
         dialog.add(new JLabel("Диагноз:"));
         dialog.add(diagnosisCombo);
-//        dialog.add(new JLabel("Врач:"));
-//        dialog.add(doctorCombo);
         dialog.add(new JLabel("Тип лечения:"));
         dialog.add(typeCombo);
         dialog.add(new JLabel("Тип наблюдения:"));
@@ -121,17 +142,30 @@ public class TreatmentSchemePanel extends JPanel {
 
         JButton saveButton = new JButton("Сохранить");
         saveButton.addActionListener(e -> {
-            TreatmentScheme scheme = new TreatmentScheme();
-            scheme.setDiagnosis((Diagnosis) diagnosisCombo.getSelectedItem());
-//            scheme.setDoctor((Doctor) doctorCombo.getSelectedItem());
-            scheme.setTreatmentType((String) typeCombo.getSelectedItem());
-            scheme.setSupervisionType((String) supervisionCombo.getSelectedItem());
-            scheme.setStartDate(LocalDate.parse(startDateField.getText()));
-            scheme.setEndDate(LocalDate.parse(endDateField.getText()));
+            try {
+                TreatmentScheme scheme = new TreatmentScheme();
+                scheme.setDiagnosis(
+                        diagnosisService.getAllDiagnoses().stream().filter(
+                                it -> it.getDescription().equals(diagnosisCombo.getSelectedItem())
+                        ).findFirst().orElse(null));
 
-            schemeService.saveScheme(scheme);
-            updateTables();
-            dialog.dispose();
+                // Конвертация русских названий в английские для хранения
+                String treatmentType = typeCombo.getSelectedItem().equals("Стационарное") ?
+                        "inpatient" : "outpatient";
+                String supervisionType = supervisionCombo.getSelectedItem().equals("Под наблюдением") ?
+                        "under supervision" : "independent";
+
+                scheme.setTreatmentType(treatmentType);
+                scheme.setSupervisionType(supervisionType);
+                scheme.setStartDate(LocalDate.parse(startDateField.getText()));
+                scheme.setEndDate(LocalDate.parse(endDateField.getText()));
+
+                schemeService.saveScheme(scheme);
+                updateTables();
+                dialog.dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, "Ошибка при сохранении: " + ex.getMessage());
+            }
         });
 
         dialog.add(new JLabel());
@@ -267,7 +301,7 @@ public class TreatmentSchemePanel extends JPanel {
 
     private static class SchemeTableModel extends AbstractTableModel {
         private final List<TreatmentScheme> schemes;
-        private final String[] columns = {"ID", "Диагноз", "Тип", "Период", "Врач"};
+        private final String[] columns = {"ID", "Диагноз", "Тип лечения", "Тип наблюдения", "Период"};
 
         public SchemeTableModel(List<TreatmentScheme> schemes) {
             this.schemes = schemes;
@@ -283,15 +317,48 @@ public class TreatmentSchemePanel extends JPanel {
             return switch (column) {
                 case 0 -> s.getId();
                 case 1 -> s.getDiagnosis().getDescription();
-                case 2 -> s.getTreatmentType();
-                case 3 -> s.getStartDate() + " - " + s.getEndDate();
-                case 4 -> s.getDoctor() != null ? s.getDoctor().getFullName() : "Не указан";
+                case 2 -> translateTreatmentType(s.getTreatmentType());
+                case 3 -> translateSupervisionType(s.getSupervisionType());
+                case 4 -> s.getStartDate() + " - " + s.getEndDate();
                 default -> null;
             };
         }
 
+        private String translateTreatmentType(String type) {
+            return "inpatient".equals(type) ? "Стационарное" : "Амбулаторное";
+        }
+
+        private String translateSupervisionType(String type) {
+            return "under supervision".equals(type) ? "Под наблюдением" : "Самостоятельное";
+        }
+
         public TreatmentScheme getSchemeAt(int row) {
             return schemes.get(row);
+        }
+    }
+
+    private static class ControlPointsTableModel extends AbstractTableModel {
+        private final List<ControlPoint> controlPoints;
+        private final String[] columns = {"Название", "Дата", "Контролер", "Метод"};
+
+        public ControlPointsTableModel(List<ControlPoint> controlPoints) {
+            this.controlPoints = controlPoints;
+        }
+
+        @Override public int getRowCount() { return controlPoints.size(); }
+        @Override public int getColumnCount() { return columns.length; }
+        @Override public String getColumnName(int column) { return columns[column]; }
+
+        @Override
+        public Object getValueAt(int row, int column) {
+            ControlPoint cp = controlPoints.get(row);
+            return switch (column) {
+                case 0 -> cp.getName();
+                case 1 -> cp.getControlDate();
+                case 2 -> cp.getController();
+                case 3 -> cp.getMethod();
+                default -> null;
+            };
         }
     }
 
